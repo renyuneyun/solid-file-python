@@ -29,7 +29,9 @@ class Auth:
         }
 
         r = self.client.post(url, data=data)
-        r.raise_for_status()
+
+        if not r.is_redirect:
+            r.raise_for_status()
 
         if not self.is_login:
             raise Exception('Cannot login.')
