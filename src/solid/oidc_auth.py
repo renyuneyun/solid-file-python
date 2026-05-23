@@ -9,9 +9,10 @@ except ImportError as e:
 
 import httpx
 from httpx import Response
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
+from threading import Thread
 from urllib.parse import urlparse, parse_qs
-from typing import Dict, Optional, Tuple, Callable
+from typing import Dict, Optional
 
 
 class OidcAuth:
@@ -32,7 +33,7 @@ class OidcAuth:
         self.callback_uri = f"http://localhost:{callback_port}{self.OAUTH_CALLBACK_PATH}"
         self.client = httpx.Client()
         self.session: Optional[SolidAuthSession] = None
-        self._server_process: Optional[Process] = None
+        self._server_thread: Optional[Thread] = None
 
     @property
     def is_login(self) -> bool:
@@ -66,16 +67,15 @@ class OidcAuth:
 
     def _login_with_server(self, solid_oidc_client: SolidOidcClient, login_url: str) -> None:
         q: Queue = Queue(1)
-        process = Process(target=_run_flask_server, args=(solid_oidc_client, self.callback_uri, q))
-        self._server_process = process
-        process.start()
+        thread = Thread(target=_run_flask_server, args=(solid_oidc_client, self.callback_uri, q), daemon=True)
+        self._server_thread = thread
+        thread.start()
 
         print(f"Please visit this URL to log in: {login_url}")
 
         session = SolidAuthSession.deserialize(q.get())
         self.session = session
-        self._server_process.terminate()
-        self._server_process = None
+        self._server_thread = None  # daemon thread exits automatically when login completes
 
     def _login_manual(self, solid_oidc_client: SolidOidcClient, login_url: str) -> None:
         print(f"Please visit this URL to log in:\n  {login_url}")
