@@ -4,7 +4,8 @@ from httpx import Response
 from solid_oidc_client import SolidOidcClient, SolidAuthSession, MemStore
 import flask
 
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
+from threading import Thread
 
 from typing import Dict
 
@@ -63,12 +64,12 @@ class OidcAuth:
         return r
 
     def _start_server(self, solid_oidc_client: SolidOidcClient, q: Queue):
-        process = Process(target=_run_flask_server, args=(solid_oidc_client, q))
-        self._server_process = process
-        process.start()
+        thread = Thread(target=_run_flask_server, args=(solid_oidc_client, q), daemon=True)
+        self._server_thread = thread
+        thread.start()
 
     def _stop_server(self):
-        self._server_process.terminate()
+        pass  # daemon thread exits automatically when login completes
 
     def login(self, idp):
         solid_oidc_client = SolidOidcClient(storage=MemStore())
